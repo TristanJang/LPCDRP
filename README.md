@@ -1,3 +1,3 @@
-# EpiLine
-Tool to assess MTb lineage based on read kinetics as a proxy for Methylation.
-Uses PacBio HiFi reads or Oxford Nanopore long reads.
+# LPCDRP
+Code written during my time in the Laboratory for Pathogenesis of Clinical Drug Resistance and Persistence
+The bulk of this code is intended for genome assembly and comparative genomics. 
