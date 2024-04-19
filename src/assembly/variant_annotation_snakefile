@@ -1,0 +1,70 @@
+import os
+grouphome = os.environ['GROUPHOME']
+ISOLATES = [i for i in open('/grp/valafar/data/depot/assembly/south_africa/isolates_contaminant_free.txt').read().split('\n') if len(i) > 0]
+
+
+rule All:
+    input:
+        expand(grouphome + "/data/depot/assembly/south_africa/variants/{isolate}_annotated.vcf", isolate=ISOLATES)
+    
+rule bgzip:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/genomes/{isolate}.fasta"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/genomes/{isolate}.fasta.gz"
+    shell:
+        """bgzip {input}"""
+
+rule convert_gff:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/annotation/{isolate}.gff"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}.gtf"
+    shell:
+        """agat_convert_sp_gff2gtf.pl --gff {input} -o {output}"""
+rule remove_hashtag:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}.gtf"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_hashtag_removed.gtf"
+    shell:
+        """grep -v "#" {input} > {output}"""
+rule change_chromosome_name:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_hashtag_removed.gtf"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_chr_name_changed.gtf"
+    shell:
+        """sed "s/06.fixstart.contig_1/1/" {input} > {output}"""
+rule sort_clean:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_chr_name_changed.gtf"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf"
+    shell:
+        """sort -k1,1 -k4,4n -k5,5n -t$"\t" {input} > {output} """
+rule zip:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf.gz"
+    shell:
+        """ bgzip -c {input} > {output}"""
+rule index:
+    input:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf.gz"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf.gz.tbi"
+    params:"-p gff"
+    wrapper:"v1.25.0/bio/tabix/index"
+rule vep:
+    input:
+        input1=grouphome + "/data/depot/assembly/south_africa/variants/{isolate}.vcf",
+    	input2=grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf.gz",
+    	input3=grouphome + "/data/depot/assembly/south_africa/genomes/{isolate}.fasta.gz",
+	    input4=grouphome + "/data/depot/assembly/south_africa/variants/intermediates/{isolate}_modified_sorted.gtf.gz.tbi"
+    output:
+        grouphome + "/data/depot/assembly/south_africa/variants/{isolate}_annotated.vcf"
+    shell:
+        """vep -i {input.input1} -gtf {input.input2} --fa {input.input3} --vcf -o {output}"""
+
